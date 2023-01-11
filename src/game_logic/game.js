@@ -63,20 +63,20 @@ export function useReverso() {
     row[x] = pawn;
     state.board = replaceAt(state.board, y, row);
 
-    reverseBoard({ x, y });
+    reverseBoard({ x, y }, pawn);
   }
 
   function canReverse({ x, y }) {
     return !!state.board[y][x]?.color;
   }
 
-  function reverseBoard({ x, y }) {
-    horizontalReverse({ x, y });
-    verticalReverse({ x, y });
-    diagonalReverse({ x, y });
+  function reverseBoard({ x, y }, triggerBy) {
+    horizontalReverse({ x, y }, triggerBy);
+    verticalReverse({ x, y }, triggerBy);
+    diagonalReverse({ x, y }, triggerBy);
   }
 
-  function horizontalReverse({ x, y }) {
+  function horizontalReverse({ x, y }, triggerBy) {
     if (!canReverse({ x, y })) return;
 
     const { color } = state.board[y][x];
@@ -84,13 +84,13 @@ export function useReverso() {
 
     const reversablePaws = findBoundary(line, {
       boundsOfColor: color,
-      andContainsPosition: x,
+      byPawn: triggerBy,
     });
 
     setColors(reversablePaws, color);
   }
 
-  function verticalReverse({ x, y }) {
+  function verticalReverse({ x, y }, triggerBy) {
     if (!canReverse({ x, y })) return;
 
     const { color } = state.board[y][x];
@@ -102,17 +102,80 @@ export function useReverso() {
 
     const reversablePaws = findBoundary(column, {
       boundsOfColor: color,
-      andContainsPosition: y,
+      byPawn: triggerBy,
     });
 
     setColors(reversablePaws, color);
   }
 
-  function diagonalReverse({ x, y }) {
-    if (!canReverse({ x, y })) return;
+  function diagonalReverse(position, triggerBy) {
+    if (!canReverse(position)) return;
 
-    const { color } = state.board[y][x];
-    // TODO
+    const { color } = state.board[position.y][position.x];
+
+    const diags = [getDiagonal_TL_BR(position), getDiagonal_BL_TR(position)];
+
+    diags.forEach((diag) => {
+      const reversablePaws = findBoundary(diag, {
+        boundsOfColor: color,
+        byPawn: triggerBy,
+      });
+
+      setColors(reversablePaws, color);
+    });
+  }
+
+  function getDiagonal_TL_BR(position) {
+    const diag = [];
+
+    const lowestAxis = position.x < position.y ? "x" : "y";
+    const maxDistance =
+      lowestAxis === "x"
+        ? position.x + (state.board.length - position.y)
+        : position.y + (state.board.length - position.x);
+    const delta = Math.abs(position.y - position.x);
+
+    for (let i = 0; i < maxDistance; i++) {
+      if (lowestAxis === "x") {
+        diag.push(state.board[i + delta][i]);
+      } else {
+        diag.push(state.board[i][i + delta]);
+      }
+    }
+
+    return diag;
+  }
+
+  function getDiagonal_BL_TR(position) {
+    const diag = [];
+
+    const zoneSource =
+      position.x + position.y < state.board.length ? "top" : "bottom";
+
+    const maxDistance =
+      position.x + position.y < state.board.length
+        ? position.x + position.y + 1
+        : state.board.length -
+          ((position.x + position.y) % state.board.length) -
+          1;
+
+    const shiftX = state.board.length - 1 - position.y;
+    const lastPoint =
+      zoneSource === "bottom"
+        ? {
+            x: position.x - shiftX,
+            y: state.board.length - 1,
+          }
+        : {
+            x: 0,
+            y: maxDistance - 1,
+          };
+
+    for (let i = 0; i < maxDistance; i++) {
+      diag.push(state.board[lastPoint.y--][lastPoint.x++]);
+    }
+
+    return diag;
   }
 
   function setColors(paws, color) {
@@ -132,20 +195,19 @@ export function useReverso() {
   };
 }
 
-function findBoundary(lineOfPaws, { boundsOfColor, andContainsPosition }) {
+function findBoundary(lineOfPawns, { boundsOfColor, byPawn }) {
   let intervals = [[]];
 
-  const formatedPawns = lineOfPaws.map((paw, i) => ({ paw, position: i }));
-  for (const { paw, position } of formatedPawns) {
+  for (const pawn of lineOfPawns) {
     // on clot un interval lorsqu'on croise la couleur demandée
-    if (!paw) {
+    if (!pawn) {
       intervals.push([]);
     } else {
       const currentInterval = intervals[intervals.length - 1];
-      currentInterval.push({ paw, position });
+      currentInterval.push(pawn);
 
-      if (currentInterval.length > 1 && paw.color === boundsOfColor) {
-        intervals.push([{ paw, position }]);
+      if (currentInterval.length > 1 && pawn.color === boundsOfColor) {
+        intervals.push([pawn]);
       }
     }
   }
@@ -154,12 +216,11 @@ function findBoundary(lineOfPaws, { boundsOfColor, andContainsPosition }) {
     .filter((bounds) => bounds.length > 2)
     .filter(
       (bounds) =>
-        bounds[0].paw.color === boundsOfColor &&
-        bounds[bounds.length - 1].paw.color === boundsOfColor
+        bounds[0].color === boundsOfColor &&
+        bounds[bounds.length - 1].color === boundsOfColor
     )
     .filter((bounds) => {
-      return bounds.some(({ position }) => position === andContainsPosition);
+      return bounds.some((pawn) => pawn.id === byPawn.id);
     })
-    .flatMap((bounds) => bounds)
-    .map(({ paw }) => paw);
+    .flatMap((bounds) => bounds);
 }
