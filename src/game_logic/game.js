@@ -5,12 +5,16 @@ import {
   WHITE,
   BOARD_HEIGHT,
   BOARD_WIDTH,
+  PLAYING_STATE,
+  END_STATE,
+  TIE,
 } from "../constants";
 import { createPawn } from "./pawn";
 import { replaceAt } from "../libs/immutable";
 
-export function useReverso() {
-  const state = reactive({
+function makeInitialState() {
+  return {
+    status: PLAYING_STATE,
     turn: 0,
     activePlayer: WHITE,
     board: Array.from({ length: BOARD_HEIGHT }, () =>
@@ -20,7 +24,12 @@ export function useReverso() {
       ...Array.from({ length: BOARD_SIZE / 2 }, () => createPawn(BLACK)),
       ...Array.from({ length: BOARD_SIZE / 2 }, () => createPawn(WHITE)),
     ],
-  });
+    winner: null,
+  };
+}
+
+export function useReverso() {
+  const state = reactive(makeInitialState());
 
   const blackStack = computed(() =>
     state.stack.filter((pawn) => pawn.color === BLACK)
@@ -28,6 +37,10 @@ export function useReverso() {
   const whiteStack = computed(() =>
     state.stack.filter((pawn) => pawn.color === WHITE)
   );
+
+  function restart() {
+    Object.assign(state, makeInitialState());
+  }
 
   function findPawnInStack(id) {
     return state.stack.find((pawn) => pawn.id === id);
@@ -49,8 +62,43 @@ export function useReverso() {
   }
 
   function nextTurn() {
-    state.turn++;
-    state.activePlayer = state.activePlayer === WHITE ? BLACK : WHITE;
+    if (!state.stack.length) {
+      state.status = END_STATE;
+      state.winner = findWinner();
+    } else {
+      state.turn++;
+      state.activePlayer = state.activePlayer === WHITE ? BLACK : WHITE;
+    }
+  }
+
+  function findWinner() {
+    const { whiteCount, blackCount } = countPawns();
+    if (whiteCount === blackCount) {
+      return TIE;
+    }
+
+    return whiteCount > blackCount ? WHITE : BLACK;
+  }
+
+  function countPawns() {
+    return state.board.reduce(
+      (acc, line) => {
+        const pawns = line.filter((pawn) => !!pawn);
+        for (const pawn of pawns) {
+          if (pawn.color === WHITE) {
+            acc.whiteCount++;
+          } else {
+            acc.blackCount++;
+          }
+        }
+
+        return acc;
+      },
+      {
+        whiteCount: 0,
+        blackCount: 0,
+      }
+    );
   }
 
   function removePawnInStack(targetedPawn) {
@@ -179,7 +227,7 @@ export function useReverso() {
   }
 
   function setColors(paws, color) {
-    // TODO: immutable way
+    // TODO: do it in an immutable way
     paws.forEach((paw) => {
       paw.color = color;
     });
@@ -192,6 +240,7 @@ export function useReverso() {
 
     findPawnInStack,
     dropPawn,
+    restart,
   };
 }
 

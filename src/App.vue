@@ -1,12 +1,12 @@
 <script setup>
 import gsap from "gsap";
-import { onMounted } from 'vue';
+import { nextTick, onMounted, watch } from 'vue';
 import Draggable from "gsap/Draggable";
 
 import Board from './components/Board.vue';
 import Pawn from './components/Pawn.vue';
 import { useReverso } from './game_logic/game';
-import { WHITE } from "./constants";
+import { BLACK, END_STATE, WHITE, TIE, PLAYING_STATE } from "./constants";
 
 function findHittedBox ($draggedPawn) {
   const $boxes = document.querySelectorAll('.droppable-box');
@@ -17,10 +17,10 @@ function findHittedBox ($draggedPawn) {
   }
 }
 
-const { activePlayer, state, whiteStack, blackStack, findPawnInStack, dropPawn } = useReverso()
+const { state, whiteStack, blackStack, findPawnInStack, dropPawn, restart } = useReverso();
 
-onMounted(() => {
-  Draggable.create('.draggable-pawn', {
+function addDragAndDrop () {
+  return Draggable.create('.draggable-pawn', {
     type: 'x, y',
     onRelease ({ target }) {
       const hittedBox = findHittedBox(target);
@@ -35,6 +35,15 @@ onMounted(() => {
       }
     }
   })
+} 
+
+onMounted(addDragAndDrop);
+
+watch(() => state.status, async (status) => {
+  if (status === PLAYING_STATE) {
+    await nextTick();
+    addDragAndDrop();
+  }
 })
 
 </script>
@@ -46,14 +55,26 @@ onMounted(() => {
     </header>
     
     <div class="game">
-      <Board :board="state.board"/>
+      <div class="board-container">
+        <Board :board="state.board"/>
+
+        <div 
+          v-if="state.status === END_STATE"
+          class="game-status"
+        >
+          <p v-if="state.winner === TIE">Egalite</p>
+          <p v-else>Les {{ state.winner === BLACK ? 'noirs' : 'blancs' }} remportent la partie</p>
+          
+          <button @click="restart">Rejouer</button>
+        </div>
+      </div>
       <div class="stacks">
         <div 
           v-for="(stack, i) in [whiteStack, blackStack]"
           :key="i"
           class="stack"
           :class="{
-            'is-disable': stack[0].color !== state.activePlayer,
+            'is-disable': stack[0]?.color !== state.activePlayer,
           }"
         >
           <Pawn 
@@ -84,6 +105,21 @@ b {
 
 .game {
   display: flex;
+}
+
+.game-container {
+  position: relative;
+}
+
+.game-status {
+  position: absolute;
+  top: 0; right: 0; bottom: 0; left: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.4);
 }
 
 .stacks {
