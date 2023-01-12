@@ -5,16 +5,16 @@ import {
   WHITE,
   BOARD_HEIGHT,
   BOARD_WIDTH,
-  PLAYING_STATE,
-  END_STATE,
+  GAME_PLAYING,
+  GAME_FINISHED,
   TIE,
 } from "../constants";
 import { createPawn } from "./pawn";
 import { replaceAt } from "../libs/immutable";
 
-function makeInitialState() {
+function makeInitialGame() {
   return {
-    status: PLAYING_STATE,
+    state: GAME_PLAYING,
     turn: 0,
     activePlayer: WHITE,
     board: Array.from({ length: BOARD_HEIGHT }, () =>
@@ -29,21 +29,21 @@ function makeInitialState() {
 }
 
 export function useReverso() {
-  const state = reactive(makeInitialState());
+  const game = reactive(makeInitialGame());
 
   const blackStack = computed(() =>
-    state.stack.filter((pawn) => pawn.color === BLACK)
+    game.stack.filter((pawn) => pawn.color === BLACK)
   );
   const whiteStack = computed(() =>
-    state.stack.filter((pawn) => pawn.color === WHITE)
+    game.stack.filter((pawn) => pawn.color === WHITE)
   );
 
   function restart() {
-    Object.assign(state, makeInitialState());
+    Object.assign(game, makeInitialGame());
   }
 
   function findPawnInStack(id) {
-    return state.stack.find((pawn) => pawn.id === id);
+    return game.stack.find((pawn) => pawn.id === id);
   }
 
   function dropPawn(pawn, position /* {x,y} */) {
@@ -55,19 +55,19 @@ export function useReverso() {
   }
 
   function canDropPawn(pawn, { x, y }) {
-    if (pawn.color !== state.activePlayer) return false; // not my turn to play
-    if (state.board[y][x]) return false; // a pawn already exists at this position
+    if (pawn.color !== game.activePlayer) return false; // not my turn to play
+    if (game.board[y][x]) return false; // a pawn already exists at this position
 
     return true;
   }
 
   function nextTurn() {
-    if (!state.stack.length) {
-      state.status = END_STATE;
-      state.winner = findWinner();
+    if (!game.stack.length) {
+      game.state = GAME_FINISHED;
+      game.winner = findWinner();
     } else {
-      state.turn++;
-      state.activePlayer = state.activePlayer === WHITE ? BLACK : WHITE;
+      game.turn++;
+      game.activePlayer = game.activePlayer === WHITE ? BLACK : WHITE;
     }
   }
 
@@ -81,7 +81,7 @@ export function useReverso() {
   }
 
   function countPawns() {
-    return state.board.reduce(
+    return game.board.reduce(
       (acc, line) => {
         const pawns = line.filter((pawn) => !!pawn);
         for (const pawn of pawns) {
@@ -102,20 +102,20 @@ export function useReverso() {
   }
 
   function removePawnInStack(targetedPawn) {
-    state.stack = state.stack.filter((pawn) => pawn.id !== targetedPawn.id);
+    game.stack = game.stack.filter((pawn) => pawn.id !== targetedPawn.id);
   }
 
   function addPawnInBoard(pawn, { x, y }) {
-    // state.board = replaceAt(state.board, atIndex, pawn);
-    const row = [...state.board[y]];
+    // game.board = replaceAt(game.board, atIndex, pawn);
+    const row = [...game.board[y]];
     row[x] = pawn;
-    state.board = replaceAt(state.board, y, row);
+    game.board = replaceAt(game.board, y, row);
 
     reverseBoard({ x, y }, pawn);
   }
 
   function canReverse({ x, y }) {
-    return !!state.board[y][x]?.color;
+    return !!game.board[y][x]?.color;
   }
 
   function reverseBoard({ x, y }, triggerBy) {
@@ -127,8 +127,8 @@ export function useReverso() {
   function horizontalReverse({ x, y }, triggerBy) {
     if (!canReverse({ x, y })) return;
 
-    const { color } = state.board[y][x];
-    const line = state.board[y];
+    const { color } = game.board[y][x];
+    const line = game.board[y];
 
     const reversablePaws = findBoundary(line, {
       boundsOfColor: color,
@@ -141,11 +141,11 @@ export function useReverso() {
   function verticalReverse({ x, y }, triggerBy) {
     if (!canReverse({ x, y })) return;
 
-    const { color } = state.board[y][x];
+    const { color } = game.board[y][x];
 
     const column = [];
-    for (let i = 0; i < state.board.length; i++) {
-      column.push(state.board[i][x]);
+    for (let i = 0; i < game.board.length; i++) {
+      column.push(game.board[i][x]);
     }
 
     const reversablePaws = findBoundary(column, {
@@ -159,7 +159,7 @@ export function useReverso() {
   function diagonalReverse(position, triggerBy) {
     if (!canReverse(position)) return;
 
-    const { color } = state.board[position.y][position.x];
+    const { color } = game.board[position.y][position.x];
 
     const diags = [getDiagonal_TL_BR(position), getDiagonal_BL_TR(position)];
 
@@ -179,15 +179,15 @@ export function useReverso() {
     const lowestAxis = position.x < position.y ? "x" : "y";
     const maxDistance =
       lowestAxis === "x"
-        ? position.x + (state.board.length - position.y)
-        : position.y + (state.board.length - position.x);
+        ? position.x + (game.board.length - position.y)
+        : position.y + (game.board.length - position.x);
     const delta = Math.abs(position.y - position.x);
 
     for (let i = 0; i < maxDistance; i++) {
       if (lowestAxis === "x") {
-        diag.push(state.board[i + delta][i]);
+        diag.push(game.board[i + delta][i]);
       } else {
-        diag.push(state.board[i][i + delta]);
+        diag.push(game.board[i][i + delta]);
       }
     }
 
@@ -198,21 +198,21 @@ export function useReverso() {
     const diag = [];
 
     const zoneSource =
-      position.x + position.y < state.board.length ? "top" : "bottom";
+      position.x + position.y < game.board.length ? "top" : "bottom";
 
     const maxDistance =
-      position.x + position.y < state.board.length
+      position.x + position.y < game.board.length
         ? position.x + position.y + 1
-        : state.board.length -
-          ((position.x + position.y) % state.board.length) -
+        : game.board.length -
+          ((position.x + position.y) % game.board.length) -
           1;
 
-    const shiftX = state.board.length - 1 - position.y;
+    const shiftX = game.board.length - 1 - position.y;
     const lastPoint =
       zoneSource === "bottom"
         ? {
             x: position.x - shiftX,
-            y: state.board.length - 1,
+            y: game.board.length - 1,
           }
         : {
             x: 0,
@@ -220,7 +220,7 @@ export function useReverso() {
           };
 
     for (let i = 0; i < maxDistance; i++) {
-      diag.push(state.board[lastPoint.y--][lastPoint.x++]);
+      diag.push(game.board[lastPoint.y--][lastPoint.x++]);
     }
 
     return diag;
@@ -234,7 +234,7 @@ export function useReverso() {
   }
 
   return {
-    state,
+    game,
     whiteStack,
     blackStack,
 

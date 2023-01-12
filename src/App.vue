@@ -6,7 +6,7 @@ import Draggable from "gsap/Draggable";
 import Board from './components/Board.vue';
 import Pawn from './components/Pawn.vue';
 import { useReverso } from './game_logic/game';
-import { BLACK, END_STATE, WHITE, TIE, PLAYING_STATE } from "./constants";
+import { BLACK, GAME_FINISHED, WHITE, TIE, GAME_PLAYING } from "./constants";
 
 function findHittedBox ($draggedPawn) {
   const $boxes = document.querySelectorAll('.droppable-box');
@@ -17,7 +17,7 @@ function findHittedBox ($draggedPawn) {
   }
 }
 
-const { state, whiteStack, blackStack, findPawnInStack, dropPawn, restart } = useReverso();
+const { game, whiteStack, blackStack, findPawnInStack, dropPawn, restart } = useReverso();
 
 function addDragAndDrop () {
   return Draggable.create('.draggable-pawn', {
@@ -39,8 +39,8 @@ function addDragAndDrop () {
 
 onMounted(addDragAndDrop);
 
-watch(() => state.status, async (status) => {
-  if (status === PLAYING_STATE) {
+watch(() => game.state, async (state) => {
+  if (state === GAME_PLAYING) {
     await nextTick();
     addDragAndDrop();
   }
@@ -51,19 +51,19 @@ watch(() => state.status, async (status) => {
 <template>
   <main>
     <header>
-      Au tour des <b>{{ state.activePlayer === WHITE ? 'blancs' : 'noirs' }}</b>
+      Au tour des <b>{{ game.activePlayer === WHITE ? 'blancs' : 'noirs' }}</b>
     </header>
     
     <div class="game">
       <div class="board-container">
-        <Board :board="state.board"/>
+        <Board :board="game.board"/>
 
         <div 
-          v-if="state.status === END_STATE"
+          v-if="game.state === GAME_FINISHED"
           class="game-status"
         >
-          <p v-if="state.winner === TIE">Egalite</p>
-          <p v-else>Les {{ state.winner === BLACK ? 'noirs' : 'blancs' }} remportent la partie</p>
+          <p v-if="game.winner === TIE">Egalite</p>
+          <p v-else>Les {{ game.winner === BLACK ? 'noirs' : 'blancs' }} remportent la partie</p>
           
           <button @click="restart">Rejouer</button>
         </div>
@@ -74,7 +74,7 @@ watch(() => state.status, async (status) => {
           :key="i"
           class="stack"
           :class="{
-            'is-disable': stack[0]?.color !== state.activePlayer,
+            'is-disable': stack[0]?.color !== game.activePlayer,
           }"
         >
           <Pawn 
@@ -90,7 +90,7 @@ watch(() => state.status, async (status) => {
       </div>
     </div>
   </main>
-  <pre class="debug">{{  state.board  }}</pre>
+  <pre class="debug">{{  game.board  }}</pre>
 </template>
 
 <style scoped>

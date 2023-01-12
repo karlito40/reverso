@@ -6,5 +6,5 @@ export const BLACK = "black";
 export const WHITE = "white";
 export const TIE = "tie";
 
-export const PLAYING_STATE = "playing";
-export const END_STATE = "end";
+export const GAME_PLAYING = "playing";
+export const GAME_FINISHED = "end";
